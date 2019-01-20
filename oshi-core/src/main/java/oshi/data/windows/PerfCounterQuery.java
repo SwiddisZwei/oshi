@@ -48,7 +48,10 @@ public class PerfCounterQuery<T extends Enum<T>> {
     protected final Class<T> propertyEnum;
     protected final String perfObject;
     protected final String perfWmiClass;
+    protected final String queryKey;
     protected CounterDataSource source;
+    protected PerfCounterQueryHandler pdhQueryHandler;
+    protected WmiQueryHandler wmiQueryHandler;
     /*
      * Only one will be non-null depending on source
      */
@@ -77,6 +80,28 @@ public class PerfCounterQuery<T extends Enum<T>> {
      *            object
      */
     public PerfCounterQuery(Class<T> propertyEnum, String perfObject, String perfWmiClass) {
+        this(propertyEnum, perfObject, perfWmiClass, perfObject);
+    }
+
+    /**
+     * Construct a new object to hold performance counter data source and
+     * results
+     * 
+     * @param propertyEnum
+     *            An enum which implements {@link PdhCounterProperty} and
+     *            contains the WMI field (Enum value) and PDH Counter string
+     *            (instance and counter)
+     * @param perfObject
+     *            The PDH object for this counter; all counters on this object
+     *            will be refreshed at the same time
+     * @param perfWmiClass
+     *            The WMI PerfData_RawData_* class corresponding to the PDH
+     *            object
+     * @param queryKey
+     *            An optional key for PDH counter updates; defaults to the PDH
+     *            object name
+     */
+    public PerfCounterQuery(Class<T> propertyEnum, String perfObject, String perfWmiClass, String queryKey) {
         if (PdhCounterProperty.class.isAssignableFrom(propertyEnum.getDeclaringClass())) {
             throw new IllegalArgumentException(
                     propertyEnum.getDeclaringClass().getName() + " must implement PdhCounterProperty.");
@@ -84,23 +109,12 @@ public class PerfCounterQuery<T extends Enum<T>> {
         this.propertyEnum = propertyEnum;
         this.perfObject = perfObject;
         this.perfWmiClass = perfWmiClass;
-
-        // Only continue if instantiating this class
-        if (!PerfCounterQuery.class.equals(this.getClass())) {
-            return;
-        }
-        // Try PDH first, fallback to WMI
-        if (!setDataSource(CounterDataSource.PDH)) {
-            LOG.debug("PDH Data Source failed for {}", perfObject);
-            setDataSource(CounterDataSource.WMI);
-        }
-        // Release handles on shutdown
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-            @Override
-            public void run() {
-                unInitPdhCounters();
-            }
-        });
+        this.queryKey = queryKey;
+        this.pdhQueryHandler = PerfCounterQueryHandler.getInstance();
+        this.wmiQueryHandler = WmiQueryHandler.createInstance();
+        // Start off with PDH as source; if query here fails we will permanently
+        // fall back to WMI
+        this.source = CounterDataSource.PDH;
     }
 
     /**
@@ -141,7 +155,7 @@ public class PerfCounterQuery<T extends Enum<T>> {
             PerfCounter counter = PerfDataUtil.createCounter(perfObject, ((PdhCounterProperty) prop).getInstance(),
                     ((PdhCounterProperty) prop).getCounter());
             counterMap.put(prop, counter);
-            if (!PerfDataUtil.addCounterToQuery(counter)) {
+            if (!pdhQueryHandler.addCounterToQuery(counter, this.queryKey)) {
                 unInitPdhCounters();
                 return false;
             }
@@ -154,11 +168,7 @@ public class PerfCounterQuery<T extends Enum<T>> {
      * counters from the PDH Query, releasing their handles.
      */
     protected void unInitPdhCounters() {
-        if (this.counterMap != null) {
-            for (PerfCounter counter : this.counterMap.values()) {
-                PerfDataUtil.removeCounterFromQuery(counter);
-            }
-        }
+        pdhQueryHandler.removeAllCountersFromQuery(this.queryKey);
         this.counterMap = null;
     }
 
@@ -188,30 +198,36 @@ public class PerfCounterQuery<T extends Enum<T>> {
         EnumMap<T, Long> valueMap = new EnumMap<>(propertyEnum);
         T[] props = this.propertyEnum.getEnumConstants();
         if (source.equals(CounterDataSource.PDH)) {
-            queryPdh(valueMap, props);
+            // Set up the query and counter handles, and query
+            if (initPdhCounters() && queryPdh(valueMap, props)) {
+                // If both init and query return true, then valueMap contains
+                // the results. Release the handles.
+                unInitPdhCounters();
+            } else {
+                // If either init or query failed, switch to WMI
+                setDataSource(CounterDataSource.WMI);
+            }
         }
-        // The pdh query may fail and set the source to WMI, so this is
-        // intentionally not an "else"
         if (source.equals(CounterDataSource.WMI)) {
             queryWmi(valueMap, props);
         }
         return valueMap;
     }
 
-    private void queryPdh(Map<T, Long> valueMap, T[] props) {
-        if (counterMap != null && 0 < PerfDataUtil.updateQuery(counterMap.get(props[0]))) {
+    private boolean queryPdh(Map<T, Long> valueMap, T[] props) {
+        if (counterMap != null && 0 < pdhQueryHandler.updateQuery(this.queryKey)) {
             for (T prop : props) {
-                valueMap.put(prop, PerfDataUtil.queryCounter(counterMap.get(prop)));
+                valueMap.put(prop, pdhQueryHandler.queryCounter(counterMap.get(prop)));
             }
-            return;
+            return true;
         }
         // Zero timestamp means update failed after muliple
         // attempts; fallback to WMI
-        setDataSource(CounterDataSource.WMI);
+        return false;
     }
 
     private void queryWmi(Map<T, Long> valueMap, T[] props) {
-        WmiResult<T> result = WmiQueryHandler.getInstance().queryWMI(this.counterQuery);
+        WmiResult<T> result = wmiQueryHandler.queryWMI(this.counterQuery);
         if (result.getResultCount() > 0) {
             for (T prop : props) {
                 switch (result.getVtType(prop)) {

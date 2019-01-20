@@ -21,65 +21,70 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package oshi.json.hardware.impl;
+package oshi.hardware.platform.unix.freebsd;
 
-import java.util.Properties;
-
-import javax.json.Json;
-import javax.json.JsonBuilderFactory;
-import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
-
-import oshi.json.hardware.Display;
-import oshi.json.json.AbstractOshiJsonObject;
-import oshi.json.json.NullAwareJsonObjectBuilder;
-import oshi.json.util.PropertiesUtil;
+import oshi.hardware.common.AbstractVirtualMemory;
+import oshi.util.ExecutingCommand;
 import oshi.util.ParseUtil;
+import oshi.util.platform.unix.freebsd.BsdSysctlUtil;
 
 /**
- * Wrapper class to implement Display interface with platform-specific objects
+ * Memory obtained by sysctl vm.stats
  */
-public class DisplayImpl extends AbstractOshiJsonObject implements Display {
+public class FreeBsdVirtualMemory extends AbstractVirtualMemory {
 
     private static final long serialVersionUID = 1L;
 
-    private transient JsonBuilderFactory jsonFactory = Json.createBuilderFactory(null);
-
-    private oshi.hardware.Display display;
-
-    /**
-     * Creates a new platform-specific Display object wrapping the provided
-     * argument
-     *
-     * @param display
-     *            a platform-specific Display object
-     */
-    public DisplayImpl(oshi.hardware.Display display) {
-        this.display = display;
-    }
-
     /**
      * {@inheritDoc}
      */
     @Override
-    public byte[] getEdid() {
-        return this.display.getEdid();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public JsonObject toJSON(Properties properties) {
-        JsonObjectBuilder json = NullAwareJsonObjectBuilder.wrap(this.jsonFactory.createObjectBuilder());
-        if (PropertiesUtil.getBoolean(properties, "hardware.displays.edid")) {
-            json.add("edid", ParseUtil.byteArrayToHexString(getEdid()));
+    public long getSwapUsed() {
+        if (this.swapUsed < 0) {
+            updateSwapUsage();
         }
-        return json.build();
+        return this.swapUsed;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public String toString() {
-        return this.display.toString();
+    public long getSwapTotal() {
+        if (this.swapTotal < 0) {
+            this.swapTotal = BsdSysctlUtil.sysctl("vm.swap_total", 0L);
+        }
+        return this.swapTotal;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public long getSwapPagesIn() {
+        if (this.swapPagesIn < 0) {
+            this.swapPagesIn = BsdSysctlUtil.sysctl("vm.stats.vm.v_swappgsin", 0L);
+        }
+        return this.swapPagesIn;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public long getSwapPagesOut() {
+        if (this.swapPagesOut < 0) {
+            this.swapPagesOut = BsdSysctlUtil.sysctl("vm.stats.vm.v_swappgsout", 0L);
+        }
+        return this.swapPagesOut;
+    }
+
+    private void updateSwapUsage() {
+        String swapInfo = ExecutingCommand.getAnswerAt("swapinfo -k", 1);
+        String[] split = ParseUtil.whitespaces.split(swapInfo);
+        if (split.length < 5) {
+            return;
+        }
+        this.swapUsed = ParseUtil.parseLongOrDefault(split[2], 0L) << 10;
     }
 }

@@ -21,21 +21,28 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package oshi.json.hardware;
-
-import oshi.json.json.OshiJsonObject;
+package oshi.util;
 
 /**
- * Display refers to the information regarding a video source and monitor
- * identified by the EDID standard.
- *
- * @author widdis[at]gmail[dot]com
+ * General constants used in multiple classes
  */
-public interface Display extends OshiJsonObject {
+public class Constants {
+
     /**
-     * The EDID byte array.
-     *
-     * @return The original unparsed EDID byte array.
+     * String to report for unknown information
      */
-    byte[] getEdid();
+    public static final String UNKNOWN = "unknown";
+
+    /**
+     * Note: /sys/class/dmi/id symlinks here, but /sys/devices/ is the
+     * official/approved path for sysfs information
+     */
+    public static final String SYSFS_SERIAL_PATH = "/sys/devices/virtual/dmi/id/";
+
+    /**
+     * Everything in this class is static, never instantiate it
+     */
+    private Constants() {
+        throw new AssertionError();
+    }
 }

@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -76,6 +77,11 @@ public class ParseUtil {
     private static final String PHZ = "PHz";
 
     private static final Map<String, Long> multipliers;
+
+    // PDH timestamps are 1601 epoch, local time
+    // Constants to convert to UTC millis
+    private static final long EPOCH_DIFF = 11644473600000L;
+    private static final int TZ_OFFSET = TimeZone.getDefault().getOffset(System.currentTimeMillis());
 
     public static final Pattern whitespacesColonWhitespace = Pattern.compile("\\s+:\\s");
 
@@ -705,5 +711,38 @@ public class ParseUtil {
             result = result.substring(0, result.indexOf(after));
         }
         return result;
+    }
+
+    /**
+     * Convert a long representing filetime (100-ns since 1601 epoch) to ms
+     * since 1970 epoch
+     *
+     * @param filetime
+     *            A 64-bit value equivalent to FILETIME
+     * @param local
+     *            True if converting from a local filetime (PDH counter); false
+     *            if already UTC (WMI PerfRawData classes)
+     * @return Equivalent milliseconds since the epoch
+     */
+    public static long filetimeToUtcMs(long filetime, boolean local) {
+        return filetime / 10000L - EPOCH_DIFF - (local ? TZ_OFFSET : 0L);
+    }
+
+    /**
+     * Parse a date in MM-DD-YYYY or MM/DD/YYYY to YYYY-MM-DD
+     * 
+     * @param dateString
+     *            The date in MM DD YYYY format
+     * @return The date in ISO YYYY-MM-DD format if parseable, or the original
+     *         string
+     */
+    public static String parseMmDdYyyyToYyyyMmDD(String dateString) {
+        try {
+            // Date is MM-DD-YYYY, convert to YYYY-MM-DD
+            return String.format("%s-%s-%s", dateString.substring(6, 10), dateString.substring(0, 2),
+                    dateString.substring(3, 5));
+        } catch (StringIndexOutOfBoundsException e) {
+            return dateString;
+        }
     }
 }

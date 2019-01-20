@@ -21,58 +21,74 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package oshi.json.hardware;
+package oshi.hardware.common;
 
-import oshi.json.json.OshiJsonObject;
+import oshi.hardware.VirtualMemory;
 
 /**
- * A USB device is a device connected via a USB port, possibly
- * internally/permanently. Hubs may contain ports to which other devices connect
- * in a recursive fashion.
- *
- * @author widdis[at]gmail[dot]com
+ * Virtual Memory info.
  */
-public interface UsbDevice extends OshiJsonObject {
-    /**
-     * Name of the USB device
-     *
-     * @return The device name
-     */
-    String getName();
+public abstract class AbstractVirtualMemory implements VirtualMemory {
+
+    private static final long serialVersionUID = 1L;
+
+    protected long swapTotal = -1L;
+    protected long swapUsed = -1L;
+    protected long swapPagesIn = -1L;
+    protected long swapPagesOut = -1L;
 
     /**
-     * Vendor that manufactured the USB device
-     *
-     * @return The vendor name
+     * {@inheritDoc}
      */
-    String getVendor();
+    @Override
+    public long getSwapUsed() {
+        if (this.swapUsed < 0) {
+            updateAttributes();
+        }
+        return this.swapUsed;
+    }
 
     /**
-     * ID of the vendor that manufactured the USB device
-     *
-     * @return The vendor ID, a 4-digit hex string
+     * {@inheritDoc}
      */
-    String getVendorId();
+    @Override
+    public long getSwapTotal() {
+        if (this.swapTotal < 0) {
+            updateAttributes();
+        }
+        return this.swapTotal;
+    }
 
     /**
-     * Product ID of the USB device
-     *
-     * @return The product ID, a 4-digit hex string
+     * {@inheritDoc}
      */
-    String getProductId();
+    @Override
+    public long getSwapPagesIn() {
+        if (this.swapPagesIn < 0) {
+            updateAttributes();
+        }
+        return this.swapPagesIn;
+    }
 
     /**
-     * Serial number of the USB device
-     *
-     * @return The serial number, if known
+     * {@inheritDoc}
      */
-    String getSerialNumber();
+    @Override
+    public long getSwapPagesOut() {
+        if (this.swapPagesOut < 0) {
+            updateAttributes();
+        }
+        return this.swapPagesOut;
+    }
 
     /**
-     * Other devices connected to this hub
-     *
-     * @return An array of other devices connected to this hub, if any, or an
-     *         empty array if none
+     * {@inheritDoc}
      */
-    UsbDevice[] getConnectedDevices();
+    @Override
+    public void updateAttributes() {
+        this.swapTotal = -1L;
+        this.swapUsed = -1L;
+        this.swapPagesIn = -1L;
+        this.swapPagesOut = -1L;
+    }
 }

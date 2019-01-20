@@ -21,7 +21,35 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+package oshi.hardware;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+import oshi.SystemInfo;
+
 /**
- * Provides utility methods for JSON and configuration
+ * Test GlobalMemory
  */
-package oshi.json.util;
+public class VirtualMemoryTest {
+    /**
+     * Test VirtualMemory.
+     */
+    @Test
+    public void testGlobalMemory() {
+        SystemInfo si = new SystemInfo();
+        HardwareAbstractionLayer hal = si.getHardware();
+        GlobalMemory memory = hal.getMemory();
+        VirtualMemory vm = memory.getVirtualMemory();
+        assertNotNull(vm);
+
+        // Swap tests
+        assertTrue(vm.getSwapPagesIn() >= 0);
+        assertTrue(vm.getSwapPagesOut() >= 0);
+        assertTrue(vm.getSwapTotal() >= 0);
+        assertTrue(vm.getSwapUsed() >= 0);
+        assertTrue(vm.getSwapUsed() <= vm.getSwapTotal());
+    }
+}

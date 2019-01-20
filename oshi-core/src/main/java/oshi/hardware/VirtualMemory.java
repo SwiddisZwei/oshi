@@ -21,34 +21,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package oshi.json.hardware;
+package oshi.hardware;
 
-import oshi.json.json.OshiJsonObject;
+import java.io.Serializable;
 
 /**
- * Memory refers to the state information of a computing system, as it is kept
- * active in some physical structure. The term "memory" is used for the
- * information in physical systems which are fast (ie. RAM), as a distinction
- * from physical systems which are slow to access (ie. data storage). By design,
- * the term "memory" refers to temporary state devices, whereas the term
- * "storage" is reserved for permanent data.
- *
- * @author dblock[at]dblock[dot]org
+ * The VirtuallMemory class tracks information about the use of a computer's
+ * virtual memory (swap file) which temporarily moves rarely accessed
+ * information to a disk or other storage device.
  */
-public interface GlobalMemory extends OshiJsonObject {
-    /**
-     * The amount of actual physical memory, in bytes.
-     *
-     * @return Total number of bytes.
-     */
-    long getTotal();
-
-    /**
-     * The amount of physical memory currently available, in bytes.
-     *
-     * @return Available number of bytes.
-     */
-    long getAvailable();
+public interface VirtualMemory extends Serializable {
 
     /**
      * The current size of the paging/swap file(s), in bytes. If the paging/swap
@@ -61,7 +43,7 @@ public interface GlobalMemory extends OshiJsonObject {
     /**
      * The current memory committed to the paging/swap file(s), in bytes
      *
-     * @return Swap used in bytes.
+     * @return Swap used in bytes
      */
     long getSwapUsed();
 
@@ -91,9 +73,7 @@ public interface GlobalMemory extends OshiJsonObject {
     long getSwapPagesOut();
 
     /**
-     * The number of bytes in a memory page
-     * 
-     * @return Page size in bytes.
+     * Update the values for the next call to the getters on this class.
      */
-    long getPageSize();
+    void updateAttributes();
 }
